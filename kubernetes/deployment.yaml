@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: matching
+  namespace: woodpantry
+  labels:
+    app: matching
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: matching
+  template:
+    metadata:
+      labels:
+        app: matching
+    spec:
+      containers:
+        - name: matching
+          image: ghcr.io/mwhite7112/woodpantry-matching:${IMAGE_TAG}
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: LOG_LEVEL
+              value: "info"
+            - name: PANTRY_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: matching-config
+                  key: pantry_url
+            - name: RECIPE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: matching-config
+                  key: recipe_url
+            - name: DICTIONARY_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: matching-config
+                  key: dictionary_url
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
