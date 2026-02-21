@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sort"
 	"sync"
 
@@ -46,6 +47,8 @@ func (s *Service) Score(ctx context.Context, allowSubs bool, maxMissing int) ([]
 	if err != nil {
 		return nil, fmt.Errorf("fetch recipes: %w", err)
 	}
+
+	slog.Debug("scoring started", "pantry_items", len(pantryItems), "recipes", len(recipes), "allow_subs", allowSubs, "max_missing", maxMissing)
 
 	// Build ingredient_id presence set from pantry.
 	pantrySet := make(map[string]bool, len(pantryItems))
@@ -107,6 +110,8 @@ func (s *Service) Score(ctx context.Context, allowSubs bool, maxMissing int) ([]
 	// Best-effort: resolve ingredient names from dictionary for missing ingredients.
 	// Errors are silently ignored — the caller still receives results without names.
 	s.resolveNames(ctx, filtered)
+
+	slog.Debug("scoring complete", "total_recipes", len(recipes), "matched", len(filtered))
 
 	return filtered, nil
 }

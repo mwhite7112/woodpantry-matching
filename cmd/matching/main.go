@@ -2,16 +2,19 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 
 	"github.com/mwhite7112/woodpantry-matching/internal/api"
 	"github.com/mwhite7112/woodpantry-matching/internal/clients"
+	"github.com/mwhite7112/woodpantry-matching/internal/logging"
 	"github.com/mwhite7112/woodpantry-matching/internal/service"
 )
 
 func main() {
+	logging.Setup()
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -19,17 +22,20 @@ func main() {
 
 	pantryURL := os.Getenv("PANTRY_URL")
 	if pantryURL == "" {
-		log.Fatal("PANTRY_URL is required")
+		slog.Error("PANTRY_URL is required")
+		os.Exit(1)
 	}
 
 	recipeURL := os.Getenv("RECIPE_URL")
 	if recipeURL == "" {
-		log.Fatal("RECIPE_URL is required")
+		slog.Error("RECIPE_URL is required")
+		os.Exit(1)
 	}
 
 	dictionaryURL := os.Getenv("DICTIONARY_URL")
 	if dictionaryURL == "" {
-		log.Fatal("DICTIONARY_URL is required")
+		slog.Error("DICTIONARY_URL is required")
+		os.Exit(1)
 	}
 
 	svc := service.New(
@@ -41,8 +47,9 @@ func main() {
 	handler := api.NewRouter(svc)
 
 	addr := fmt.Sprintf(":%s", port)
-	log.Printf("matching service listening on %s", addr)
+	slog.Info("matching service listening", "addr", addr)
 	if err := http.ListenAndServe(addr, handler); err != nil {
-		log.Fatalf("server error: %v", err)
+		slog.Error("server error", "error", err)
+		os.Exit(1)
 	}
 }
