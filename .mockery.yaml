@@ -1,0 +1,9 @@
+with-expecter: true
+dir: "internal/mocks"
+outpkg: "mocks"
+packages:
+  github.com/mwhite7112/woodpantry-matching/internal/service:
+    interfaces:
+      PantryFetcher:
+      RecipeFetcher:
+      DictionaryFetcher:

@@ -25,12 +25,12 @@ type MatchResult struct {
 }
 
 type Service struct {
-	pantry     *clients.PantryClient
-	recipes    *clients.RecipeClient
-	dictionary *clients.DictionaryClient
+	pantry     PantryFetcher
+	recipes    RecipeFetcher
+	dictionary DictionaryFetcher
 }
 
-func New(pantry *clients.PantryClient, recipes *clients.RecipeClient, dictionary *clients.DictionaryClient) *Service {
+func New(pantry PantryFetcher, recipes RecipeFetcher, dictionary DictionaryFetcher) *Service {
 	return &Service{pantry: pantry, recipes: recipes, dictionary: dictionary}
 }
 
