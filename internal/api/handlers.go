@@ -2,16 +2,19 @@ package api
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/mwhite7112/woodpantry-matching/internal/logging"
 	"github.com/mwhite7112/woodpantry-matching/internal/service"
 )
 
 func NewRouter(svc *service.Service) http.Handler {
 	r := chi.NewRouter()
+	r.Use(logging.Middleware)
 	r.Use(middleware.Recoverer)
 
 	r.Get("/healthz", handleHealth)
@@ -46,7 +49,7 @@ func handleGetMatches(svc *service.Service) http.HandlerFunc {
 
 		results, err := svc.Score(r.Context(), allowSubs, maxMissing)
 		if err != nil {
-			jsonError(w, "scoring failed: "+err.Error(), http.StatusBadGateway)
+			jsonError(w, "scoring failed: "+err.Error(), http.StatusBadGateway, err)
 			return
 		}
 		jsonOK(w, results)
@@ -54,9 +57,9 @@ func handleGetMatches(svc *service.Service) http.HandlerFunc {
 }
 
 type matchQueryRequest struct {
-	Prompt           string `json:"prompt"`
-	PantryConstrained bool  `json:"pantry_constrained"`
-	MaxMissing       int   `json:"max_missing"`
+	Prompt            string `json:"prompt"`
+	PantryConstrained bool   `json:"pantry_constrained"`
+	MaxMissing        int    `json:"max_missing"`
 }
 
 // handlePostMatchQuery is the primary "what do I cook tonight?" interface.
@@ -76,7 +79,7 @@ func handlePostMatchQuery(svc *service.Service) http.HandlerFunc {
 
 		results, err := svc.Score(r.Context(), false, maxMissing)
 		if err != nil {
-			jsonError(w, "scoring failed: "+err.Error(), http.StatusBadGateway)
+			jsonError(w, "scoring failed: "+err.Error(), http.StatusBadGateway, err)
 			return
 		}
 		jsonOK(w, results)
@@ -88,7 +91,10 @@ func jsonOK(w http.ResponseWriter, v any) {
 	json.NewEncoder(w).Encode(v) //nolint:errcheck
 }
 
-func jsonError(w http.ResponseWriter, msg string, status int) {
+func jsonError(w http.ResponseWriter, msg string, status int, errs ...error) {
+	if status >= 500 && len(errs) > 0 {
+		slog.Error(msg, "status", status, "error", errs[0])
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]string{"error": msg}) //nolint:errcheck
