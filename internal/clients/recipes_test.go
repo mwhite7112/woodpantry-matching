@@ -16,7 +16,11 @@ func TestGetRecipes_Success(t *testing.T) {
 		assert.Equal(t, "/recipes", r.URL.Path)
 		assert.Equal(t, http.MethodGet, r.Method)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`[{"id":"r1","title":"Pasta","tags":["dinner"],"prep_minutes":10,"cook_minutes":20,"ingredients":[{"id":"ri1","ingredient_id":"ing1","quantity":1,"unit":"cup","is_optional":false}]}]`))
+		w.Write(
+			[]byte(
+				`[{"id":"r1","title":"Pasta","tags":["dinner"],"prep_minutes":10,"cook_minutes":20,"ingredients":[{"id":"ri1","ingredient_id":"ing1","quantity":1,"unit":"cup","is_optional":false}]}]`,
+			),
+		)
 	}))
 	defer server.Close()
 

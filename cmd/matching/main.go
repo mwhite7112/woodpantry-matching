@@ -14,6 +14,7 @@ import (
 
 func main() {
 	logging.Setup()
+	logger := slog.Default()
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -22,19 +23,19 @@ func main() {
 
 	pantryURL := os.Getenv("PANTRY_URL")
 	if pantryURL == "" {
-		slog.Error("PANTRY_URL is required")
+		logger.Error("PANTRY_URL is required")
 		os.Exit(1)
 	}
 
 	recipeURL := os.Getenv("RECIPE_URL")
 	if recipeURL == "" {
-		slog.Error("RECIPE_URL is required")
+		logger.Error("RECIPE_URL is required")
 		os.Exit(1)
 	}
 
 	dictionaryURL := os.Getenv("DICTIONARY_URL")
 	if dictionaryURL == "" {
-		slog.Error("DICTIONARY_URL is required")
+		logger.Error("DICTIONARY_URL is required")
 		os.Exit(1)
 	}
 
@@ -47,9 +48,9 @@ func main() {
 	handler := api.NewRouter(svc)
 
 	addr := fmt.Sprintf(":%s", port)
-	slog.Info("matching service listening", "addr", addr)
+	logger.Info("matching service listening", "addr", addr)
 	if err := http.ListenAndServe(addr, handler); err != nil {
-		slog.Error("server error", "error", err)
+		logger.Error("server error", "error", err)
 		os.Exit(1)
 	}
 }

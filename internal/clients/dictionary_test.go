@@ -38,7 +38,7 @@ func TestGetIngredient_NotFound(t *testing.T) {
 	client := &DictionaryClient{baseURL: server.URL, http: server.Client()}
 	detail, err := client.GetIngredient(context.Background(), "missing")
 
-	require.NoError(t, err)
+	require.ErrorIs(t, err, ErrIngredientNotFound)
 	assert.Nil(t, detail)
 }
 
@@ -85,7 +85,7 @@ func TestGetSubstitutes_NotFound(t *testing.T) {
 	subs, err := client.GetSubstitutes(context.Background(), "missing")
 
 	require.NoError(t, err)
-	assert.Nil(t, subs)
+	assert.Empty(t, subs)
 }
 
 func TestGetSubstitutes_MethodNotAllowed(t *testing.T) {
@@ -99,7 +99,7 @@ func TestGetSubstitutes_MethodNotAllowed(t *testing.T) {
 	subs, err := client.GetSubstitutes(context.Background(), "abc")
 
 	require.NoError(t, err)
-	assert.Nil(t, subs)
+	assert.Empty(t, subs)
 }
 
 func TestGetSubstitutes_ServerError(t *testing.T) {

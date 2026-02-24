@@ -2,32 +2,35 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/mwhite7112/woodpantry-matching/internal/clients"
-	"github.com/mwhite7112/woodpantry-matching/internal/mocks"
-	"github.com/mwhite7112/woodpantry-matching/internal/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/mwhite7112/woodpantry-matching/internal/clients"
+	"github.com/mwhite7112/woodpantry-matching/internal/mocks"
+	"github.com/mwhite7112/woodpantry-matching/internal/service"
 )
 
-func setupRouter(t *testing.T) (http.Handler, *mocks.MockPantryFetcher, *mocks.MockRecipeFetcher, *mocks.MockDictionaryFetcher) {
+func setupRouter(
+	t *testing.T,
+) (http.Handler, *mocks.MockPantryFetcher, *mocks.MockRecipeFetcher) {
 	pantryMock := mocks.NewMockPantryFetcher(t)
 	recipeMock := mocks.NewMockRecipeFetcher(t)
 	dictMock := mocks.NewMockDictionaryFetcher(t)
 
 	svc := service.New(pantryMock, recipeMock, dictMock)
 	router := NewRouter(svc)
-	return router, pantryMock, recipeMock, dictMock
+	return router, pantryMock, recipeMock
 }
 
 func TestHealthz(t *testing.T) {
-	router, _, _, _ := setupRouter(t)
+	router, _, _ := setupRouter(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	rec := httptest.NewRecorder()
@@ -38,7 +41,7 @@ func TestHealthz(t *testing.T) {
 }
 
 func TestGetMatches_Success(t *testing.T) {
-	router, pantryMock, recipeMock, _ := setupRouter(t)
+	router, pantryMock, recipeMock := setupRouter(t)
 
 	pantryMock.EXPECT().GetPantry(mock.Anything).Return([]clients.PantryItem{
 		{ID: "p1", IngredientID: "ing1"},
@@ -62,11 +65,11 @@ func TestGetMatches_Success(t *testing.T) {
 	var results []service.MatchResult
 	require.NoError(t, json.NewDecoder(rec.Body).Decode(&results))
 	require.Len(t, results, 1)
-	assert.Equal(t, 100.0, results[0].CoveragePct)
+	assert.InDelta(t, 100.0, results[0].CoveragePct, 0.0001)
 }
 
 func TestGetMatches_InvalidMaxMissing(t *testing.T) {
-	router, _, _, _ := setupRouter(t)
+	router, _, _ := setupRouter(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/matches?max_missing=abc", nil)
 	rec := httptest.NewRecorder()
@@ -76,7 +79,7 @@ func TestGetMatches_InvalidMaxMissing(t *testing.T) {
 }
 
 func TestGetMatches_NegativeMaxMissing(t *testing.T) {
-	router, _, _, _ := setupRouter(t)
+	router, _, _ := setupRouter(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/matches?max_missing=-1", nil)
 	rec := httptest.NewRecorder()
@@ -86,9 +89,9 @@ func TestGetMatches_NegativeMaxMissing(t *testing.T) {
 }
 
 func TestGetMatches_BackendError(t *testing.T) {
-	router, pantryMock, _, _ := setupRouter(t)
+	router, pantryMock, _ := setupRouter(t)
 
-	pantryMock.EXPECT().GetPantry(mock.Anything).Return(nil, fmt.Errorf("down"))
+	pantryMock.EXPECT().GetPantry(mock.Anything).Return(nil, errors.New("down"))
 
 	req := httptest.NewRequest(http.MethodGet, "/matches", nil)
 	rec := httptest.NewRecorder()
@@ -98,7 +101,7 @@ func TestGetMatches_BackendError(t *testing.T) {
 }
 
 func TestPostMatchQuery_Success(t *testing.T) {
-	router, pantryMock, recipeMock, _ := setupRouter(t)
+	router, pantryMock, recipeMock := setupRouter(t)
 
 	pantryMock.EXPECT().GetPantry(mock.Anything).Return([]clients.PantryItem{}, nil)
 	recipeMock.EXPECT().GetRecipes(mock.Anything).Return([]clients.Recipe{}, nil)
@@ -113,7 +116,7 @@ func TestPostMatchQuery_Success(t *testing.T) {
 }
 
 func TestPostMatchQuery_InvalidBody(t *testing.T) {
-	router, _, _, _ := setupRouter(t)
+	router, _, _ := setupRouter(t)
 
 	req := httptest.NewRequest(http.MethodPost, "/matches/query", strings.NewReader(`{bad`))
 	req.Header.Set("Content-Type", "application/json")
@@ -124,7 +127,7 @@ func TestPostMatchQuery_InvalidBody(t *testing.T) {
 }
 
 func TestPostMatchQuery_NegativeMaxMissing(t *testing.T) {
-	router, pantryMock, recipeMock, _ := setupRouter(t)
+	router, pantryMock, recipeMock := setupRouter(t)
 
 	pantryMock.EXPECT().GetPantry(mock.Anything).Return([]clients.PantryItem{}, nil)
 	recipeMock.EXPECT().GetRecipes(mock.Anything).Return([]clients.Recipe{}, nil)

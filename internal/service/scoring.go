@@ -10,6 +10,8 @@ import (
 	"github.com/mwhite7112/woodpantry-matching/internal/clients"
 )
 
+const coveragePercentScale = 100.0
+
 type MissingIngredient struct {
 	IngredientID string  `json:"ingredient_id"`
 	Name         string  `json:"name,omitempty"`
@@ -38,6 +40,8 @@ func New(pantry PantryFetcher, recipes RecipeFetcher, dictionary DictionaryFetch
 // coverage, and returns results ranked by coverage descending.
 // Only recipes with missing_count <= maxMissing are included in the result.
 func (s *Service) Score(ctx context.Context, allowSubs bool, maxMissing int) ([]MatchResult, error) {
+	logger := slog.Default()
+
 	pantryItems, err := s.pantry.GetPantry(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("fetch pantry: %w", err)
@@ -48,42 +52,24 @@ func (s *Service) Score(ctx context.Context, allowSubs bool, maxMissing int) ([]
 		return nil, fmt.Errorf("fetch recipes: %w", err)
 	}
 
-	slog.Debug("scoring started", "pantry_items", len(pantryItems), "recipes", len(recipes), "allow_subs", allowSubs, "max_missing", maxMissing)
+	logger.DebugContext(
+		ctx,
+		"scoring started",
+		"pantry_items",
+		len(pantryItems),
+		"recipes",
+		len(recipes),
+		"allow_subs",
+		allowSubs,
+		"max_missing",
+		maxMissing,
+	)
 
-	// Build ingredient_id presence set from pantry.
-	pantrySet := make(map[string]bool, len(pantryItems))
-	for _, item := range pantryItems {
-		pantrySet[item.IngredientID] = true
-	}
+	pantrySet := buildPantrySet(pantryItems)
 
-	// Pre-fetch substitute data in parallel for all required-but-missing ingredient IDs.
 	subsMap := make(map[string][]clients.IngredientSubstitute)
 	if allowSubs {
-		missingIDs := make(map[string]bool)
-		for _, recipe := range recipes {
-			for _, ing := range recipe.Ingredients {
-				if !ing.IsOptional && !pantrySet[ing.IngredientID] {
-					missingIDs[ing.IngredientID] = true
-				}
-			}
-		}
-
-		var mu sync.Mutex
-		var wg sync.WaitGroup
-		for id := range missingIDs {
-			wg.Add(1)
-			go func(ingredientID string) {
-				defer wg.Done()
-				subs, err := s.dictionary.GetSubstitutes(ctx, ingredientID)
-				if err != nil || subs == nil {
-					return
-				}
-				mu.Lock()
-				subsMap[ingredientID] = subs
-				mu.Unlock()
-			}(id)
-		}
-		wg.Wait()
+		subsMap = s.prefetchSubstitutes(ctx, recipes, pantrySet)
 	}
 
 	results := make([]MatchResult, 0, len(recipes))
@@ -111,9 +97,57 @@ func (s *Service) Score(ctx context.Context, allowSubs bool, maxMissing int) ([]
 	// Errors are silently ignored — the caller still receives results without names.
 	s.resolveNames(ctx, filtered)
 
-	slog.Debug("scoring complete", "total_recipes", len(recipes), "matched", len(filtered))
+	logger.DebugContext(ctx, "scoring complete", "total_recipes", len(recipes), "matched", len(filtered))
 
 	return filtered, nil
+}
+
+func buildPantrySet(pantryItems []clients.PantryItem) map[string]bool {
+	pantrySet := make(map[string]bool, len(pantryItems))
+	for _, item := range pantryItems {
+		pantrySet[item.IngredientID] = true
+	}
+	return pantrySet
+}
+
+func (s *Service) prefetchSubstitutes(
+	ctx context.Context,
+	recipes []clients.Recipe,
+	pantrySet map[string]bool,
+) map[string][]clients.IngredientSubstitute {
+	missingIDs := collectMissingIngredientIDs(recipes, pantrySet)
+	subsMap := make(map[string][]clients.IngredientSubstitute, len(missingIDs))
+
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for id := range missingIDs {
+		wg.Add(1)
+		go func(ingredientID string) {
+			defer wg.Done()
+			subs, err := s.dictionary.GetSubstitutes(ctx, ingredientID)
+			if err != nil || len(subs) == 0 {
+				return
+			}
+			mu.Lock()
+			subsMap[ingredientID] = subs
+			mu.Unlock()
+		}(id)
+	}
+	wg.Wait()
+
+	return subsMap
+}
+
+func collectMissingIngredientIDs(recipes []clients.Recipe, pantrySet map[string]bool) map[string]bool {
+	missingIDs := make(map[string]bool)
+	for _, recipe := range recipes {
+		for _, ing := range recipe.Ingredients {
+			if !ing.IsOptional && !pantrySet[ing.IngredientID] {
+				missingIDs[ing.IngredientID] = true
+			}
+		}
+	}
+	return missingIDs
 }
 
 // scoreRecipe computes a single recipe's coverage score against the pantry set.
@@ -134,7 +168,7 @@ func scoreRecipe(
 	if len(required) == 0 {
 		return MatchResult{
 			Recipe:             recipe,
-			CoveragePct:        100.0,
+			CoveragePct:        coveragePercentScale,
 			MissingIngredients: []MissingIngredient{},
 			CanMake:            true,
 		}
@@ -168,7 +202,7 @@ func scoreRecipe(
 		}
 	}
 
-	coveragePct := float64(matched) / float64(len(required)) * 100.0
+	coveragePct := float64(matched) / float64(len(required)) * coveragePercentScale
 	return MatchResult{
 		Recipe:             recipe,
 		CoveragePct:        coveragePct,

@@ -2,14 +2,15 @@ package service
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"testing"
 
-	"github.com/mwhite7112/woodpantry-matching/internal/clients"
-	"github.com/mwhite7112/woodpantry-matching/internal/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/mwhite7112/woodpantry-matching/internal/clients"
+	"github.com/mwhite7112/woodpantry-matching/internal/mocks"
 )
 
 func TestScoreRecipe_AllInPantry(t *testing.T) {
@@ -26,7 +27,7 @@ func TestScoreRecipe_AllInPantry(t *testing.T) {
 
 	result := scoreRecipe(recipe, pantrySet, nil, 0)
 
-	assert.Equal(t, 100.0, result.CoveragePct)
+	assert.InDelta(t, 100.0, result.CoveragePct, 0.0001)
 	assert.True(t, result.CanMake)
 	assert.Empty(t, result.MissingIngredients)
 }
@@ -45,7 +46,7 @@ func TestScoreRecipe_PartialCoverage(t *testing.T) {
 
 	result := scoreRecipe(recipe, pantrySet, nil, 0)
 
-	assert.Equal(t, 50.0, result.CoveragePct)
+	assert.InDelta(t, 50.0, result.CoveragePct, 0.0001)
 	assert.False(t, result.CanMake)
 	assert.Len(t, result.MissingIngredients, 1)
 	assert.Equal(t, "ing2", result.MissingIngredients[0].IngredientID)
@@ -65,7 +66,7 @@ func TestScoreRecipe_OptionalOnlyMissing(t *testing.T) {
 
 	result := scoreRecipe(recipe, pantrySet, nil, 0)
 
-	assert.Equal(t, 100.0, result.CoveragePct)
+	assert.InDelta(t, 100.0, result.CoveragePct, 0.0001)
 	assert.True(t, result.CanMake)
 	assert.Empty(t, result.MissingIngredients)
 }
@@ -109,7 +110,7 @@ func TestScoreRecipe_SubstituteMatching(t *testing.T) {
 
 	result := scoreRecipe(recipe, pantrySet, subsMap, 0)
 
-	assert.Equal(t, 100.0, result.CoveragePct)
+	assert.InDelta(t, 100.0, result.CoveragePct, 0.0001)
 	assert.True(t, result.CanMake)
 	assert.Empty(t, result.MissingIngredients)
 }
@@ -127,7 +128,7 @@ func TestScoreRecipe_EmptyPantry(t *testing.T) {
 
 	result := scoreRecipe(recipe, pantrySet, nil, 0)
 
-	assert.Equal(t, 0.0, result.CoveragePct)
+	assert.InDelta(t, 0.0, result.CoveragePct, 0.0001)
 	assert.False(t, result.CanMake)
 }
 
@@ -142,7 +143,7 @@ func TestScoreRecipe_EmptyRecipeIngredients(t *testing.T) {
 
 	result := scoreRecipe(recipe, pantrySet, nil, 0)
 
-	assert.Equal(t, 100.0, result.CoveragePct)
+	assert.InDelta(t, 100.0, result.CoveragePct, 0.0001)
 	assert.True(t, result.CanMake)
 }
 
@@ -160,7 +161,7 @@ func TestScoreRecipe_AllOptional(t *testing.T) {
 
 	result := scoreRecipe(recipe, pantrySet, nil, 0)
 
-	assert.Equal(t, 100.0, result.CoveragePct)
+	assert.InDelta(t, 100.0, result.CoveragePct, 0.0001)
 	assert.True(t, result.CanMake)
 }
 
@@ -193,7 +194,9 @@ func TestScore_RankingOrder(t *testing.T) {
 	}, nil)
 
 	// resolveNames will try to fetch ingredient names for missing ingredients
-	dictMock.EXPECT().GetIngredient(mock.Anything, "ing2").Return(&clients.IngredientDetail{ID: "ing2", Name: "butter"}, nil)
+	dictMock.EXPECT().
+		GetIngredient(mock.Anything, "ing2").
+		Return(&clients.IngredientDetail{ID: "ing2", Name: "butter"}, nil)
 
 	svc := New(pantryMock, recipeMock, dictMock)
 	results, err := svc.Score(context.Background(), false, 1)
@@ -201,9 +204,9 @@ func TestScore_RankingOrder(t *testing.T) {
 
 	require.Len(t, results, 2)
 	assert.Equal(t, "Full match", results[0].Recipe.Title)
-	assert.Equal(t, 100.0, results[0].CoveragePct)
+	assert.InDelta(t, 100.0, results[0].CoveragePct, 0.0001)
 	assert.Equal(t, "No match", results[1].Recipe.Title)
-	assert.Equal(t, 0.0, results[1].CoveragePct)
+	assert.InDelta(t, 0.0, results[1].CoveragePct, 0.0001)
 }
 
 func TestScore_FiltersByCanMake(t *testing.T) {
@@ -251,7 +254,7 @@ func TestScore_PantryFetchError(t *testing.T) {
 	recipeMock := mocks.NewMockRecipeFetcher(t)
 	dictMock := mocks.NewMockDictionaryFetcher(t)
 
-	pantryMock.EXPECT().GetPantry(mock.Anything).Return(nil, fmt.Errorf("pantry down"))
+	pantryMock.EXPECT().GetPantry(mock.Anything).Return(nil, errors.New("pantry down"))
 
 	svc := New(pantryMock, recipeMock, dictMock)
 	_, err := svc.Score(context.Background(), false, 0)
@@ -267,7 +270,7 @@ func TestScore_RecipeFetchError(t *testing.T) {
 	dictMock := mocks.NewMockDictionaryFetcher(t)
 
 	pantryMock.EXPECT().GetPantry(mock.Anything).Return([]clients.PantryItem{}, nil)
-	recipeMock.EXPECT().GetRecipes(mock.Anything).Return(nil, fmt.Errorf("recipes down"))
+	recipeMock.EXPECT().GetRecipes(mock.Anything).Return(nil, errors.New("recipes down"))
 
 	svc := New(pantryMock, recipeMock, dictMock)
 	_, err := svc.Score(context.Background(), false, 0)
