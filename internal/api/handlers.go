@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
 	"github.com/mwhite7112/woodpantry-matching/internal/logging"
 	"github.com/mwhite7112/woodpantry-matching/internal/service"
 )
@@ -72,10 +73,7 @@ func handlePostMatchQuery(svc *service.Service) http.HandlerFunc {
 			return
 		}
 
-		maxMissing := req.MaxMissing
-		if maxMissing < 0 {
-			maxMissing = 0
-		}
+		maxMissing := max(req.MaxMissing, 0)
 
 		results, err := svc.Score(r.Context(), false, maxMissing)
 		if err != nil {
@@ -93,7 +91,8 @@ func jsonOK(w http.ResponseWriter, v any) {
 
 func jsonError(w http.ResponseWriter, msg string, status int, errs ...error) {
 	if status >= 500 && len(errs) > 0 {
-		slog.Error(msg, "status", status, "error", errs[0])
+		logger := slog.Default()
+		logger.Error(msg, "status", status, "error", errs[0])
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

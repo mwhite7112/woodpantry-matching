@@ -3,9 +3,12 @@ package clients
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 )
+
+var ErrIngredientNotFound = errors.New("ingredient not found")
 
 // IngredientDetail mirrors the fields returned by GET /ingredients/:id on the
 // Ingredient Dictionary service. Field names are capitalized because the
@@ -32,7 +35,8 @@ func NewDictionaryClient(baseURL string) *DictionaryClient {
 	return &DictionaryClient{baseURL: baseURL, http: &http.Client{}}
 }
 
-// GetIngredient fetches a single ingredient by ID. Returns nil if not found.
+// GetIngredient fetches a single ingredient by ID.
+// Returns [ErrIngredientNotFound] when the ingredient does not exist.
 func (c *DictionaryClient) GetIngredient(ctx context.Context, id string) (*IngredientDetail, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/ingredients/"+id, nil)
 	if err != nil {
@@ -46,7 +50,7 @@ func (c *DictionaryClient) GetIngredient(ctx context.Context, id string) (*Ingre
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, nil
+		return nil, ErrIngredientNotFound
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("dictionary service returned %d", resp.StatusCode)
@@ -60,10 +64,15 @@ func (c *DictionaryClient) GetIngredient(ctx context.Context, id string) (*Ingre
 }
 
 // GetSubstitutes fetches substitute ingredients for the given ingredient ID.
-// Returns nil without error if the endpoint is not yet available (404/405),
+// Returns an empty slice without error if the endpoint is not yet available (404/405),
 // making this safe to call before the dictionary service exposes the endpoint.
 func (c *DictionaryClient) GetSubstitutes(ctx context.Context, ingredientID string) ([]IngredientSubstitute, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/ingredients/"+ingredientID+"/substitutes", nil)
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		c.baseURL+"/ingredients/"+ingredientID+"/substitutes",
+		nil,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -75,7 +84,7 @@ func (c *DictionaryClient) GetSubstitutes(ctx context.Context, ingredientID stri
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusMethodNotAllowed {
-		return nil, nil
+		return []IngredientSubstitute{}, nil
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("dictionary service returned %d", resp.StatusCode)

@@ -27,7 +27,7 @@ func TestGetPantry_Success(t *testing.T) {
 	require.Len(t, items, 1)
 	assert.Equal(t, "p1", items[0].ID)
 	assert.Equal(t, "ing1", items[0].IngredientID)
-	assert.Equal(t, 2.5, items[0].Quantity)
+	assert.InDelta(t, 2.5, items[0].Quantity, 0.0001)
 	assert.Equal(t, "cup", items[0].Unit)
 }
 

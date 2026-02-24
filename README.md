@@ -91,6 +91,48 @@ The LLM re-ranks from the deterministic candidate set — it never surfaces reci
 
 ## Development
 
+### Prerequisites
+
+- Go 1.23+
+- [mockery](https://vektra.github.io/mockery/) v2 (`go install github.com/vektra/mockery/v2@latest`)
+- Running instances of Pantry Service, Recipe Service, and Ingredient Dictionary (or use the mock clients in tests)
+
+### Local Setup
+
+```bash
+export PANTRY_URL="http://localhost:8082"
+export RECIPE_URL="http://localhost:8083"
+export DICTIONARY_URL="http://localhost:8081"
+export LOG_LEVEL=debug
+```
+
+### Run
+
 ```bash
 go run ./cmd/matching/main.go
+```
+
+### Test
+
+```bash
+make test                  # unit tests
+make test-coverage         # unit tests with coverage report
+make test-coverage-html    # HTML coverage report (opens coverage.html)
+```
+
+No integration tests — this service is stateless and has no database. All external dependencies are behind interfaces, tested via mocks and httptest servers.
+
+### CI
+
+Pull request CI runs:
+- Blocking lint via `.golangci.yaml`
+- Advisory lint via `.golangci-advisory.yaml` (`continue-on-error`)
+- Unit tests (`go test -race ./...`)
+- Integration-tag test sweep (`go test -race -tags=integration ./...`; currently no integration-tagged tests)
+- Docker image build validation (`docker build --tag woodpantry-matching:ci .`)
+
+### Code Generation
+
+```bash
+make generate-mocks        # regenerate mocks from interfaces via mockery
 ```

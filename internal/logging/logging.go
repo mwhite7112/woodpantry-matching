@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+const (
+	statusWarnMin  = 400
+	statusErrorMin = 500
+)
+
 // Setup configures the global slog default with a JSON handler at the level
 // specified by the LOG_LEVEL environment variable (debug, info, warn, error).
 func Setup() {
@@ -25,9 +30,10 @@ func Setup() {
 	})))
 }
 
-// responseWriter wraps http.ResponseWriter to capture the status code.
+// responseWriter wraps [http.ResponseWriter] to capture the status code.
 type responseWriter struct {
 	http.ResponseWriter
+
 	status int
 }
 
@@ -58,9 +64,9 @@ func Middleware(next http.Handler) http.Handler {
 		}
 
 		switch {
-		case rw.status >= 500:
+		case rw.status >= statusErrorMin:
 			slog.LogAttrs(r.Context(), slog.LevelError, "request", attrs...)
-		case rw.status >= 400:
+		case rw.status >= statusWarnMin:
 			slog.LogAttrs(r.Context(), slog.LevelWarn, "request", attrs...)
 		default:
 			slog.LogAttrs(r.Context(), slog.LevelInfo, "request", attrs...)
