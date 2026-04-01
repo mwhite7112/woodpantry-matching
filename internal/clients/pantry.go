@@ -39,9 +39,11 @@ func (c *PantryClient) GetPantry(ctx context.Context) ([]PantryItem, error) {
 		return nil, fmt.Errorf("pantry service returned %d", resp.StatusCode)
 	}
 
-	var items []PantryItem
-	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
+	var wrapper struct {
+		Items []PantryItem `json:"items"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&wrapper); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
-	return items, nil
+	return wrapper.Items, nil
 }

@@ -16,10 +16,9 @@ func TestGetPantry_Success(t *testing.T) {
 		assert.Equal(t, "/pantry", r.URL.Path)
 		assert.Equal(t, http.MethodGet, r.Method)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`[{"id":"p1","ingredient_id":"ing1","quantity":2.5,"unit":"cup"}]`))
+		w.Write([]byte(`{"items":[{"id":"p1","ingredient_id":"ing1","quantity":2.5,"unit":"cup"}]}`))
 	}))
 	defer server.Close()
-
 	client := &PantryClient{baseURL: server.URL, http: server.Client()}
 	items, err := client.GetPantry(context.Background())
 
