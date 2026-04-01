@@ -24,24 +24,26 @@ func NewPantryClient(baseURL string) *PantryClient {
 }
 
 func (c *PantryClient) GetPantry(ctx context.Context) ([]PantryItem, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/pantry", nil)
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
+        req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/pantry", nil)
+        if err != nil {
+                return nil, fmt.Errorf("create request: %w", err)
+        }
 
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("do request: %w", err)
-	}
-	defer resp.Body.Close()
+        resp, err := c.http.Do(req)
+        if err != nil {
+                return nil, fmt.Errorf("do request: %w", err)
+        }
+        defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("pantry service returned %d", resp.StatusCode)
-	}
+        if resp.StatusCode != http.StatusOK {
+                return nil, fmt.Errorf("pantry service returned %d", resp.StatusCode)
+        }
 
-	var items []PantryItem
-	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
-	}
-	return items, nil
+        var wrapper struct {
+                Items []PantryItem `json:"items"`
+        }
+        if err := json.NewDecoder(resp.Body).Decode(&wrapper); err != nil {
+                return nil, fmt.Errorf("decode response: %w", err)
+        }
+        return wrapper.Items, nil
 }
